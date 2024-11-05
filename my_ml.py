@@ -6,7 +6,7 @@ from typing import Dict, List
 
 @serve.deployment
 class TextGenerationService:
-    def __init__(self, model_uri: str):
+    def __init__(self):
         mlflow.set_tracking_uri(uri="http://release-name-mlflow.default.svc.cluster.local:5000")
         model_uri = "runs:/4a5f12b720534457a67aa8c5934a8fd3/text_generator"  # 替换为实际的 model_uri
         self.model = mlflow.pyfunc.load_model(model_uri)
