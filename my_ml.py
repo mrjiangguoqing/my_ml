@@ -8,7 +8,7 @@ from typing import Dict, List
 class TextGenerationService:
     def __init__(self):
         mlflow.set_tracking_uri(uri="http://release-name-mlflow.default.svc.cluster.local:5000")
-        model_uri = "/data/model_data/' .'/model_data/14/4a5f12b720534457a67aa8c5934a8fd3/artifacts/text_generator"  # 替换为实际的 model_uri
+        model_uri = "/data/model_data/model/model_data/14/4a5f12b720534457a67aa8c5934a8fd3/artifacts/text_generator"  # 替换为实际的 model_uri
         self.model = mlflow.pyfunc.load_model(model_uri)
         self.default_params = {"max_length": 512, "do_sample": True, "temperature": 0.4}
 
