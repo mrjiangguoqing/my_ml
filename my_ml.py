@@ -19,4 +19,4 @@ class TextGenerationService:
 # 启动服务并绑定模型
 mlflow.set_tracking_uri(uri="http://release-name-mlflow.default.svc.cluster.local:5000")
 model_uri = "runs:/4a5f12b720534457a67aa8c5934a8fd3/text_generator"  # 替换为实际的 model_uri
-text_generation_service = TextGenerationService.bind(model_uri)
+text_generation_service = TextGenerationService.bind()
