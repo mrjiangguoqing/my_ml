@@ -16,7 +16,7 @@ class TextGenerationService:
         input_data = await request.json()
         text_inputs = input_data.get("texts", [])
         params = input_data.get("params", self.default_params)
-        return self.model.predict(text_inputs, **params)
+        return self.model.predict(text_inputs)
 
 # 启动服务并绑定
 text_generation_service = TextGenerationService.bind()
