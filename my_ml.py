@@ -7,6 +7,8 @@ from typing import Dict, List
 @serve.deployment
 class TextGenerationService:
     def __init__(self, model_uri: str):
+        mlflow.set_tracking_uri(uri="http://release-name-mlflow.default.svc.cluster.local:5000")
+        model_uri = "runs:/4a5f12b720534457a67aa8c5934a8fd3/text_generator"  # 替换为实际的 model_uri
         self.model = mlflow.pyfunc.load_model(model_uri)
         self.default_params = {"max_length": 512, "do_sample": True, "temperature": 0.4}
 
@@ -16,7 +18,5 @@ class TextGenerationService:
         params = input_data.get("params", self.default_params)
         return self.model.predict(text_inputs, **params)
 
-# 启动服务并绑定模型
-mlflow.set_tracking_uri(uri="http://release-name-mlflow.default.svc.cluster.local:5000")
-model_uri = "runs:/4a5f12b720534457a67aa8c5934a8fd3/text_generator"  # 替换为实际的 model_uri
+# 启动服务并绑定
 text_generation_service = TextGenerationService.bind()
