@@ -1,0 +1,35 @@
+from ray import serve
+from transformers import AutoTokenizer, AutoModel
+import torch
+from fastapi import Request
+
+@serve.deployment(route_prefix="/distilbert")  # 定义路由前缀
+class DistilBERTDeployment:
+    def __init__(self):
+        # 加载 Hugging Face 模型
+        model_name = serve.get_deployment_context().user_config.get("model_path", "distilbert-base-uncased")
+        self.tokenizer = AutoTokenizer.from_pretrained(model_name)
+        self.model = AutoModel.from_pretrained(model_name)
+
+    def preprocess(self, text: str):
+        """对输入文本进行tokenization"""
+        return self.tokenizer(text, return_tensors="pt", padding=True, truncation=True)
+
+    def inference(self, inputs):
+        """生成嵌入向量"""
+        with torch.no_grad():
+            outputs = self.model(**inputs)
+            return outputs.last_hidden_state.mean(dim=1).tolist()
+
+    async def __call__(self, request: Request):
+        """处理 HTTP 请求"""
+        data = await request.json()
+        text = data.get("text", "")
+        if not text:
+            return {"error": "No input text provided"}
+
+        tokenized_inputs = self.preprocess(text)
+        embeddings = self.inference(tokenized_inputs)
+        return {"embeddings": embeddings}
+
+app = DistilBERTDeployment.bind()
