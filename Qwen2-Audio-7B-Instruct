@@ -1,0 +1,76 @@
+from ray import serve
+from transformers import AutoTokenizer, AutoModel
+import torch
+from fastapi import FastAPI, Request
+from io import BytesIO
+from urllib.request import urlopen
+import librosa
+from transformers import Qwen2AudioForConditionalGeneration, AutoProcessor
+
+# 加载模型和处理器
+processor = AutoProcessor.from_pretrained("Qwen/Qwen2-Audio-7B-Instruct")
+model = Qwen2AudioForConditionalGeneration.from_pretrained("Qwen/Qwen2-Audio-7B-Instruct", device_map="auto")
+
+# 创建 FastAPI 应用
+app = FastAPI()
+
+# 定义输入数据模型
+class AudioRequest(BaseModel):
+    audio_urls: list[str]
+
+# 定义 Ray Serve 后端服务
+@serve.deployment(route_prefix="/qwen2-audio")  # 定义路由前缀
+class AudioModelService:
+    def __init__(self):
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+
+    def process_audio(self, audio_url: str):
+        """从音频 URL 加载音频文件"""
+        audio_data = BytesIO(urlopen(audio_url).read())
+        audio, _ = librosa.load(audio_data, sr=processor.feature_extractor.sampling_rate)
+        return audio
+
+    def generate_response(self, conversation):
+        """生成响应"""
+        text = processor.apply_chat_template(conversation, add_generation_prompt=True, tokenize=False)
+        audios = []
+
+        # 提取音频数据
+        for message in conversation:
+            if isinstance(message["content"], list):
+                for ele in message["content"]:
+                    if ele["type"] == "audio":
+                        audios.append(self.process_audio(ele["audio_url"]))
+
+        # 生成模型输入
+        inputs = processor(text=text, audios=audios, return_tensors="pt", padding=True)
+        inputs.input_ids = inputs.input_ids.to(self.device)
+
+        # 生成文本响应
+        generate_ids = model.generate(**inputs, max_length=256)
+        generate_ids = generate_ids[:, inputs.input_ids.size(1):]
+
+        # 解码生成的 ID
+        response = processor.batch_decode(generate_ids, skip_special_tokens=True, clean_up_tokenization_spaces=False)[0]
+        return response
+
+    async def __call__(self, request: Request):
+        """处理 HTTP 请求"""
+        data = await request.json()
+        audio_urls = data.get("audio_urls", [])
+        if not audio_urls:
+            return {"error": "No audio URLs provided"}
+
+        # 构造对话内容
+        conversation = [
+            {"role": "user", "content": [{"type": "audio", "audio_url": url} for url in audio_urls]},
+            {"role": "assistant", "content": "Yes, the speaker is female and in her twenties."},
+            {"role": "user", "content": [{"type": "audio", "audio_url": "https://qianwen-res.oss-cn-beijing.aliyuncs.com/Qwen2-Audio/audio/translate_to_chinese.wav"}]},
+        ]
+        
+        # 生成响应
+        response = self.generate_response(conversation)
+        return {"response": response}
+
+# 部署模型服务
+audio_model_service = AudioModelService.bind()
